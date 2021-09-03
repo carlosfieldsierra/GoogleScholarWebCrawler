@@ -1,0 +1,117 @@
+
+const puppeteer = require("puppeteer")
+
+module.exports = class Paper{
+    constructor(userId,link){
+        this.page = null;
+        this.userId=userId;
+        this.link = link;
+        this.citationId = this.getCitationId(link);
+        this.json = {
+            userId,
+            link,
+            citationId:this.citationId,
+        }
+    }
+     /*
+     Things to collect:
+        - Publisher
+        - Total citations
+        - Publication date
+        - Authors
+        - Citation History
+        - Conference
+        - PDF link
+        - Journal
+        - Source
+     */
+
+    async run(){  
+        // Set up
+        const browser  = await puppeteer.launch({headless:true, defaultViewport:null,});
+        const page = await browser.newPage();
+        this.page = page;
+        await page.goto(this.link,{waitUntil:"networkidle0"});
+        // Scrape
+        await this.getBasicInfo();
+
+        await this.getCitationHistory();
+
+        browser.close();
+
+    }
+
+
+    async getBasicInfo(){
+        //<== Html selectors ==>
+        const fieldNameClassName = ".gsc_oci_field";
+        const valueClassName = ".gsc_oci_value";
+
+        // <== Logic ==>
+
+        // get fields 
+        const page = this.page;
+        const fieldNameLst = await page.$$eval(fieldNameClassName, (options) =>
+            options.map((option) => option.textContent
+        ));
+        const valueLst = await page.$$eval(valueClassName, (options) =>
+            options.map((option) => option.textContent
+        ));
+        
+
+        // <== Set data to json ==>
+        for (var i in fieldNameLst){
+            const fieldName = fieldNameLst[i];
+            if (fieldName==="Description"){
+                continue
+            }
+            if (fieldName=="Total citations"){
+                continue
+            }
+            const value = valueLst[i];
+            this.json[fieldName] = value
+        }
+        
+
+    }
+
+
+    async getCitationHistory(){
+        //<== Html selectors ==>
+        const citationDateClassName = ".gsc_oci_g_t";
+        const citationValClassName = ".gsc_oci_g_a";
+        // <== Logic ==>
+
+        const page = this.page;
+        const datesLst = await page.$$eval(citationDateClassName, (options) =>
+            options.map((option) => option.textContent
+        ));
+        const valLst = await page.$$eval(citationValClassName, (options) =>
+            options.map((option) => option.textContent
+        ));
+
+        this.json.yearscitation = [];
+        var totalCitations = 0
+        for (var i in valLst){
+            const date = datesLst[i];
+            totalCitations+= parseInt(valLst[i], 10)
+            this.json.yearscitation.push(
+                {
+                    [date]:valLst[i],
+                }
+            )
+        }
+        this.json.totalCitations = totalCitations
+
+    }
+   
+
+    // Gets citation id from url
+    getCitationId(link){
+        const urlParameterForCitationId = 'citation_for_view';
+        const urlParams = new URLSearchParams(link);
+        const citationId = urlParams.get(urlParameterForCitationId);
+        return citationId;
+    }
+
+}
