@@ -1,7 +1,19 @@
+/*
+    Author: Carlos Field-Sierra
+*/
 
-const puppeteer = require("puppeteer")
+// Imports
+import puppeteer from "puppeteer-extra"
+// Add stealth plugin and use defaults (all tricks to hide puppeteer usage)
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+puppeteer.use(StealthPlugin())
 
-module.exports = class Paper{
+// Add adblocker plugin to block all ads and trackers (saves bandwidth)
+import AdblockerPlugin from 'puppeteer-extra-plugin-adblocker'
+puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
+
+
+export default class Paper{
     constructor(userId,link){
         this.page = null;
         this.userId=userId;
@@ -26,22 +38,49 @@ module.exports = class Paper{
         - Source
      */
 
+
     async run(){  
-        // Set up
+        // <== Set up ==>
         const browser  = await puppeteer.launch({headless:true, defaultViewport:null,});
         const page = await browser.newPage();
         this.page = page;
         await page.goto(this.link,{waitUntil:"networkidle0"});
-        // Scrape
-        await this.getBasicInfo();
+        
+        // <== Scrape ==>
+        
+        // gets basic info about paper
+        try {
+            await this.getBasicInfo(); 
+        } catch{
+            // let it be known that it failed
+        }
 
-        await this.getCitationHistory();
+        // gets citation history of paper
+        try {
+            await this.getCitationHistory(); 
+        } catch{
+           // let it be known that it failed
+        }
 
+
+        // <== Close ==>
         browser.close();
 
     }
 
 
+    /**
+      Gets the info below,
+      
+      "Authors",
+      "Publication date",
+      "Journal",
+      "Volume",
+      "Issue",
+      "Pages",
+      "Publisher",
+      "Scholar articles",
+     */
     async getBasicInfo(){
         //<== Html selectors ==>
         const fieldNameClassName = ".gsc_oci_field";
@@ -76,6 +115,9 @@ module.exports = class Paper{
     }
 
 
+    /**
+     * Gets the citation history
+     */
     async getCitationHistory(){
         //<== Html selectors ==>
         const citationDateClassName = ".gsc_oci_g_t";
@@ -106,7 +148,10 @@ module.exports = class Paper{
     }
    
 
-    // Gets citation id from url
+  /**
+   *  Every paper has its own paperId,
+   *  this function gets it's from the url
+   */
     getCitationId(link){
         const urlParameterForCitationId = 'citation_for_view';
         const urlParams = new URLSearchParams(link);

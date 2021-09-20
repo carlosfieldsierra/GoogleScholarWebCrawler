@@ -1,10 +1,29 @@
+/*
+    Author: Carlos Field-Sierra
+*/
+
+// TODO
 // To set user agent
-// 
-const puppeteer = require("puppeteer")
-const Paper = require("./Paper") 
+// await button.evaluate(b => b.click());
+// https://stackoverflow.com/questions/51857070/puppeteer-in-nodejs-reports-error-node-is-either-not-visible-or-not-an-htmlele
+//
 
 
-module.exports = class User{
+// Imports
+import puppeteer from "puppeteer-extra"
+// Add stealth plugin and use defaults (all tricks to hide puppeteer usage)
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+puppeteer.use(StealthPlugin())
+
+// Add adblocker plugin to block all ads and trackers (saves bandwidth)
+import AdblockerPlugin from 'puppeteer-extra-plugin-adblocker'
+puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
+
+
+import Paper from "./Paper.js"
+
+export default class User{
+    
     constructor(userId){
         this.userId = userId;
         this.urlPath = `https://scholar.google.com/citations?hl=en&user=${userId}`;
@@ -24,31 +43,41 @@ module.exports = class User{
     // Run the scraping for user
     async run(){
         // <== Set up browser ==>
-        const browser  = await puppeteer.launch({headless:true, defaultViewport:null,});
+        const browser  = await puppeteer.launch({headless:false, defaultViewport:null,
+
+        });
         const page = await browser.newPage();
         this.page = page;
         await page.goto(this.urlPath,{waitUntil:"networkidle0"});
 
+
+        const orgId = await this.getUsersOrgId().catch(e=>console.log(e));
         // <== Scrape the info ==>
         try{
 
             await this.getCitationHistory(); // Get citationsHistory
-        } catch{
+        } catch(err){
             // <== Keep track that this part failed ==>
+            console.log(`\x1b[1m\x1b[31m\x1b[43m%s${"\x1b[0m"}`,`ERROR: ${"getCitationHistory"} error with ${this.urlPath}`)
+            console.log(`\x1b[1m\x1b[41m\x1b[37m%s${"\x1b[0m"}`,err)
         }
 
         try{
             await this.getBasicInfo();  // Get basic Info
 
-        } catch{
+        } catch(err){
             // <== Keep track that this part failed ==>
+            console.log(`${"getBasicInfo"} error with ${this.urlPath}`)
+            console.log(err)
         }
 
         try{
 
             await this.getResearchIntrests(); // Get research intrest
-        } catch{
+        } catch(err){
             // <== Keep track that this part failed ==>
+            console.log(`${"getResearchIntrests"} error with ${this.urlPath}`)
+            console.log(err)
         }
 
         try{
@@ -56,29 +85,52 @@ module.exports = class User{
             await this.getFullNameAndDesignation(); //  Gets full name and designation
         } catch{
             // <== Keep track that this part failed ==>
+            console.log(`${"getFullNameAndDesignation"} error with ${this.urlPath}`)
+            console.log(err)
         }
 
+        // gets all papers to show
         try{
 
             await this.getAllPapersToShow(); // Gets all papers to show by pressing the show more button
         } catch{
             // <== Keep track that this part failed ==>
+            console.log(`${"getAllPapersToShow"} error with ${this.urlPath}`)
+            console.log(err)
+            
         }
 
-        await this.getAllPapers() // Gets all the papers json information
 
+        // Gets all the papers json information
         try{
-
+            await this.getAllPapers() 
         } catch{
             // <== Keep track that this part failed ==>
-            console.log("error")
+            console.log(`${"getAllPapers"} error with ${this.urlPath}`)
+            console.log(err)
         }
 
+        await this.getCoAuthors();
+
+
+        
         // const url = await page.url();
-       
-        // console.log(url);
         console.log("DONE")
         // browser.close();
+    }
+
+    async getUsersOrgId(){
+        //<== Html selectors ==>
+        const linkToShcoolClassName = ".gsc_prf_ila";
+        // <== Logic ==>
+        const page = this.page;
+        let orgId = null;
+        const hrefs = await page.$$eval(linkToShcoolClassName, links => links.map(a => a.href));
+        const href = hrefs[0];
+        const urlParams = new URLSearchParams(href);
+        orgId = urlParams.get("org");
+
+        return orgId;
     }
     
     // Gets the citations history
@@ -94,6 +146,7 @@ module.exports = class User{
 
         // Opens page
         const page = this.page;
+
         await page.click(openCitationHistortBtnId);
     
         // Get citations and date
@@ -227,6 +280,7 @@ module.exports = class User{
 
     }
 
+    // Gets information about all the papers 
     async getAllPapers(){
         //<== Html selectors ==>
         const paperLinksClassName = ".gsc_a_at";
@@ -251,17 +305,15 @@ module.exports = class User{
         // Visit all the papers as links
         const hrefs = await page.$$eval(paperLinksClassName, links => links.map(a => a.href));
         
-        // ---- parellel get papers
+        // <---- parellel get papers --->
         /*
         This ways much faster but could lead to overload
         and crashes
         */
-    //    var start = new Date();
-      
-
         this.json.papers = []
         const  getPaperData = async (href,idx)=>{
             const paper = new Paper(this.userId,href);
+            await this.wait();
             await paper.run();
             paper.json.totalCitation = citedByValLst[idx];
             paper.json.year = citedByYearLst[idx];
@@ -272,7 +324,7 @@ module.exports = class User{
         for (var i=0;hrefs.length-5>i;i+=5){
             
             const paperObjs = hrefs.slice(i,i+5).map((href,idx)=>{return getPaperData(href,idx)})
-            const papersJson= await Promise.all(paperObjs).catch(e=>console.log(e));
+            const papersJson= await Promise.all(paperObjs).catch(e=>ç(e));
             
             this.json.papers= this.json.papers.concat(papersJson)
         }
@@ -285,45 +337,67 @@ module.exports = class User{
         const paperObjs = hrefs.slice(hrefs.length-leftIdx,hrefs.length).map((href,idx)=>{return getPaperData(href,idx)})
         const papersJson= await Promise.all(paperObjs).catch(e=>console.log(e));
         this.json.papers = this.json.papers.concat(papersJson)
-
-
-    //     var finish = new Date();
-    //     var difference = new Date();
-    //     difference.setTime(finish.getTime() - start.getTime());
-    //     console.log( "TIME TOOK-->",difference.getMilliseconds() );
         
-        //---
+        
 
-        // Itervailey get papers
         /*
+        <====== Itervailey get papers ======>
         This ways very very very slow, but reliable
         */
-    //    var start = new Date();
+        //    var start = new Date();
 
-    //     this.json.papers = [];
-    //     for (var i in hrefs){
-    //         const href = hrefs[i];
-    //         const paper = new Paper(this.userId,href);
-    //         await paper.run();
-    //         /* 
-    //             This is setting the paper.json
-    //             with the total citation and year 
-    //             based on the list from the user page
-    //         */
-    //         paper.json.totalCitation = citedByValLst[i];
-    //         paper.json.year = citedByYearLst[i];
-    //         // -----------
-    //         this.json.papers.push(
-    //             paper.json
-    //         )
-    //     }  
-         
-    //     var finish = new Date();
-    //     var difference = new Date();
-    //     difference.setTime(finish.getTime() - start.getTime());
-    //     console.log( "TIME TOOK-->",difference.getMilliseconds() )
-    //     //-----
-        
+        //     this.json.papers = [];
+        //     for (var i in hrefs){
+        //         const href = hrefs[i];
+        //         const paper = new Paper(this.userId,href);
+        //         await paper.run();
+        //         /* 
+        //             This is setting the paper.json
+        //             with the total citation and year 
+        //             based on the list from the user page
+        //         */
+        //         paper.json.totalCitation = citedByValLst[i];
+        //         paper.json.year = citedByYearLst[i];
+        //         // -----------
+        //         this.json.papers.push(
+        //             paper.json
+        //         )
+        //     }  
+            
+        //     var finish = new Date();
+        //     var difference = new Date();
+        //     difference.setTime(finish.getTime() - start.getTime());
+        //     console.log( "TIME TOOK-->",difference.getMilliseconds() )
+        //     //-----
+    }
+
+    // getsUserId from link
+    getUserId(link){
+        const urlParameterForCitationId = 'user';
+        const urlParams = new URLSearchParams(link);
+        const userId = urlParams.get(urlParameterForCitationId);
+        return userId;
+    }
+    // Gets the coAuthors
+    async getCoAuthors(){
+        // <== Html selectors ==>
+        const coAuthorOpenIdName = "#gsc_coauth_opn";
+        const exitCoAuthorIdName = "#gsc_md_cod-x";
+        const coAuthorsLinkClassName = ".gs_ai_name a"
+        // <== Logic ==>
+        const page = this.page
+        await page.click(coAuthorOpenIdName); // Open page 
+        await this.wait();
+
+        // get all links to coAuthors
+        const hrefs = await page.$$eval(coAuthorsLinkClassName, links => links.map(a => a.href));
+        const userIdsList = hrefs.map(link=>{ return this.getUserId(link)})
+        // <== Set data to json ==>
+        this.json.coAuthors = userIdsList;
+
+        await page.click(exitCoAuthorIdName); // Close page
+
+
     }
 
 }
