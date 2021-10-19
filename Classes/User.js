@@ -1,5 +1,6 @@
 /*
     Author: Carlos Field-Sierra
+    Desc:
 */
 
 // TODO
@@ -15,9 +16,9 @@ import puppeteer from "puppeteer-extra"
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 puppeteer.use(StealthPlugin())
 
-// Add adblocker plugin to block all ads and trackers (saves bandwidth)
-import AdblockerPlugin from 'puppeteer-extra-plugin-adblocker'
-puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
+// // Add adblocker plugin to block all ads and trackers (saves bandwidth)
+// import AdblockerPlugin from 'puppeteer-extra-plugin-adblocker'
+// puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
 
 
 import Paper from "./Paper.js"
@@ -51,7 +52,7 @@ export default class User{
         await page.goto(this.urlPath,{waitUntil:"networkidle0"});
 
 
-        const orgId = await this.getUsersOrgId().catch(e=>console.log(e));
+        // const orgId = await this.getUsersOrgId().catch(e=>console.log(e));
         // <== Scrape the info ==>
         try{
 
@@ -83,7 +84,7 @@ export default class User{
         try{
 
             await this.getFullNameAndDesignation(); //  Gets full name and designation
-        } catch{
+        } catch(err){
             // <== Keep track that this part failed ==>
             console.log(`${"getFullNameAndDesignation"} error with ${this.urlPath}`)
             console.log(err)
@@ -93,7 +94,7 @@ export default class User{
         try{
 
             await this.getAllPapersToShow(); // Gets all papers to show by pressing the show more button
-        } catch{
+        } catch(err){
             // <== Keep track that this part failed ==>
             console.log(`${"getAllPapersToShow"} error with ${this.urlPath}`)
             console.log(err)
@@ -104,19 +105,23 @@ export default class User{
         // Gets all the papers json information
         try{
             await this.getAllPapers() 
-        } catch{
+        } catch(err){
             // <== Keep track that this part failed ==>
             console.log(`${"getAllPapers"} error with ${this.urlPath}`)
             console.log(err)
         }
 
-        await this.getCoAuthors();
+        try{
+
+            await this.getCoAuthors();
+        } catch(err){
+            console.log(`${"getCoAuthors"} error with ${this.urlPath}`)
+            console.log(err)
+        }
 
 
-        
-        // const url = await page.url();
+    
         console.log("DONE")
-        // browser.close();
     }
 
     async getUsersOrgId(){
@@ -386,6 +391,7 @@ export default class User{
         const coAuthorsLinkClassName = ".gs_ai_name a"
         // <== Logic ==>
         const page = this.page
+   
         await page.click(coAuthorOpenIdName); // Open page 
         await this.wait();
 
@@ -396,7 +402,7 @@ export default class User{
         this.json.coAuthors = userIdsList;
 
         await page.click(exitCoAuthorIdName); // Close page
-
+        
 
     }
 

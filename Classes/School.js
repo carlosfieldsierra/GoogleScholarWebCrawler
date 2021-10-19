@@ -1,6 +1,7 @@
 
 /*
     Author: Carlos Field-Sierra
+    Desc:
 */
 import puppeteer from "puppeteer"
 import User from "./User.js";
@@ -26,9 +27,18 @@ export default class School{
         // Scrape
         let  pagesOver = await this.pagesOver();
         while (!pagesOver){
-            await this.getNextPage();
-            await this.getFacultyOnPage();
-            break
+            try {
+                await this.getNextPage();
+            } catch (err){
+                console.log(`Error at School.js at getNextPage()`)
+                console.log(err)
+            }
+            try {
+                await this.getFacultyOnPage();
+            } catch (err){
+                console.log("Error at School.js at getFacultyOnPage()")
+                console.log(err)
+            }
             pagesOver = await this.pagesOver();
         }
         

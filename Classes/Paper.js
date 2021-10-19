@@ -1,16 +1,16 @@
 /*
     Author: Carlos Field-Sierra
+    Desc:
 */
 
 // Imports
 import puppeteer from "puppeteer-extra"
+
 // Add stealth plugin and use defaults (all tricks to hide puppeteer usage)
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 puppeteer.use(StealthPlugin())
 
-// Add adblocker plugin to block all ads and trackers (saves bandwidth)
-import AdblockerPlugin from 'puppeteer-extra-plugin-adblocker'
-puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
+
 
 
 export default class Paper{
@@ -51,15 +51,19 @@ export default class Paper{
         // gets basic info about paper
         try {
             await this.getBasicInfo(); 
-        } catch{
+        } catch (err){
             // let it be known that it failed
+            console.log(`Error at Paper.js at getBasicInfo`)
+            console.log(err)
         }
 
         // gets citation history of paper
         try {
             await this.getCitationHistory(); 
-        } catch{
+        } catch (err){
            // let it be known that it failed
+            console.log(`Error at Paper.js at getCitationHistory()`)
+            console.log(err)
         }
 
 
